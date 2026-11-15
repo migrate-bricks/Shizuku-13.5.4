@@ -1,19 +1,20 @@
 name: push-to-archive-store
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     env:
+      PROJECT_NAME: idle-fish-spider
       TARGET_GH_OWNER: migrate-bricks
       TARGET_GH_REPO: archive-store
       TARGET_GH_TOKEN: ${{ secrets.API_GITHUB_TOKEN }}
-      SOURCE_DIR: Shizuku-13.5.4
-      ARCHIVE_NAME: Shizuku-13.5.4.7z
-      ARCHIVE_B64_FILE: Shizuku-13.5.4.txt
+      SOURCE_DIR: ${{ env.PROJECT_NAME }}
+      ARCHIVE_NAME: ${{ env.PROJECT_NAME }}.7z
+      ARCHIVE_B64_FILE: ${{ env.PROJECT_NAME }}.txt
       ARCHIVE_PASSWORD: ${{ secrets.ARCHIVE_PASSWORD }}
     steps:
       - name: Disable Git auto line ending conversion
