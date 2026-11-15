@@ -1,0 +1,80 @@
+name: push-to-archive-store
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      TARGET_GH_OWNER: migrate-bricks
+      TARGET_GH_REPO: archive-store
+      TARGET_GH_TOKEN: ${{ secrets.API_GITHUB_TOKEN }}
+      SOURCE_DIR: idle-fish-spider
+      ARCHIVE_NAME: idle-fish-spider.7z
+      ARCHIVE_B64_FILE: idle-fish-spider.txt
+      ARCHIVE_PASSWORD: ${{ secrets.ARCHIVE_PASSWORD }}
+    steps:
+      - name: Disable Git auto line ending conversion
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Install 7z dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y p7zip-full
+
+      - name: Clone source repository
+        run: |
+          git clone "https://${{ env.TARGET_GH_TOKEN }}@github.com/${{ env.TARGET_GH_OWNER }}/${{ env.SOURCE_DIR }}.git" "./${{ env.SOURCE_DIR }}"
+
+      - name: Build encrypted 7z from HEAD snapshot
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ARCHIVE_PASSWORD}" ]]; then
+            echo "ARCHIVE_PASSWORD is empty; set it in repository secrets" >&2
+            exit 1
+          fi
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          stage_dir="$tmp_dir/stage"
+          mkdir -p "$stage_dir"
+
+          git -C "${SOURCE_DIR}" archive --format=tar HEAD | tar -xf - -C "$stage_dir"
+
+          pushd "$stage_dir" > /dev/null
+          7z a -t7z -mx=9 -mhe=on -p"${ARCHIVE_PASSWORD}" "${GITHUB_WORKSPACE}/${ARCHIVE_NAME}" .
+          popd > /dev/null
+
+          ls -lh "${ARCHIVE_NAME}"
+
+      - name: Convert 7z to single-line base64
+        run: |
+          base64 -w 0 "${ARCHIVE_NAME}" > "${ARCHIVE_B64_FILE}"
+          echo "Base64 text generated: ${ARCHIVE_B64_FILE}"
+          echo "Base64 chars: $(wc -c < "${ARCHIVE_B64_FILE}")"
+
+      - name: Clone target archive repository
+        run: |
+          git clone "https://${{ env.TARGET_GH_TOKEN }}@github.com/${{ env.TARGET_GH_OWNER }}/${{ env.TARGET_GH_REPO }}.git" target_repo
+
+      - name: Publish latest archive text as single commit
+        run: |
+          cd target_repo
+          git config user.name "GitHub Action Bot"
+          git config user.email "action@github.com"
+          git checkout --orphan temp_branch
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp ../${{ env.ARCHIVE_B64_FILE }} ./${{ env.ARCHIVE_B64_FILE }}
+          git add .
+          git commit -m "Auto archive latest source $(date '+%Y-%m-%d')"
+          if git show-ref --verify --quiet refs/heads/main; then
+            git branch -D main
+          fi
+          git branch -m main
+          git push --force-with-lease origin main
