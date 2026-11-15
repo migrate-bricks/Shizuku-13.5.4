@@ -11,9 +11,9 @@ jobs:
       TARGET_GH_OWNER: migrate-bricks
       TARGET_GH_REPO: archive-store
       TARGET_GH_TOKEN: ${{ secrets.API_GITHUB_TOKEN }}
-      SOURCE_DIR: idle-fish-spider
-      ARCHIVE_NAME: idle-fish-spider.7z
-      ARCHIVE_B64_FILE: idle-fish-spider.txt
+      SOURCE_DIR: Shizuku-13.5.4
+      ARCHIVE_NAME: Shizuku-13.5.4.7z
+      ARCHIVE_B64_FILE: Shizuku-13.5.4.txt
       ARCHIVE_PASSWORD: ${{ secrets.ARCHIVE_PASSWORD }}
     steps:
       - name: Disable Git auto line ending conversion
